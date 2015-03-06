@@ -59,6 +59,46 @@ module Fixtures
         end
       end
     end
+
+    base.let(:jsonapi_serializer_class) do
+      Class.new(Oat::Serializer) do
+        klass = self
+
+        schema do
+          type 'user' if respond_to?(:type)
+          link :self, url_for(item.id)
+          link :empty, nil
+
+          meta :nation, 'zulu'
+
+          property :id, item.id
+          map_properties :name, :age
+          properties do |attrs|
+            attrs.controller_name context[:name]
+            attrs.message_from_above context[:message]
+          end
+
+          entities :friends, item.friends, klass, :message => "Merged into parent's context"
+
+          entity :manager, item.manager do |manager, s|
+            s.type 'manager'
+            s.link :self, url_for(manager.id)
+            s.properties do |attrs|
+              attrs.id manager.id
+              attrs.name manager.name
+              attrs.age manager.age
+            end
+
+            entities :friends, item.friends, klass, :message => "Merged into parent's context"
+          end
+        end
+
+        def url_for(id)
+          "http://foo.bar.com/#{id}"
+        end
+      end
+    end
+
     base.let(:array_of_linked_objects_serializer_class) do
       Class.new(Oat::Serializer) do
         schema do

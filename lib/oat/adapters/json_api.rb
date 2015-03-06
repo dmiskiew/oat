@@ -33,16 +33,17 @@ module Oat
         if opts.is_a?(Hash)
           templated = opts.delete(:templated)
           if templated
-            link_template(rel, opts[:href])
+            link_template(rel, opts[:resource])
           else
             check_link_keys(opts)
           end
         end
+        check_link_values(rel, opts)
         data[:links][rel] = opts unless templated
       end
 
       def check_link_keys(opts)
-        unsupported_opts = opts.keys - [:href, :id, :ids, :type]
+        unsupported_opts = opts.keys - [:self, :resource, :id, :type, :meta]
 
         unless unsupported_opts.empty?
           raise ArgumentError, "Unsupported opts: #{unsupported_opts.join(", ")}"
@@ -52,6 +53,23 @@ module Oat
         end
       end
       private :check_link_keys
+
+      def check_link_values(rel, opts)
+        return if opts.nil? or opts.is_a?(String)
+
+        if rel == :self
+          raise 'A self member MUST BE a URL for the relationship itself (a "relationship URL")'
+        end
+
+        if rel == :resource
+          raise 'A resource member MUST BE a a related resource URL'
+        end
+
+        unless opts.is_a?(Hash)
+          raise 'Linkage to other resource objects MUST BE included in a compound document or a URL to fetch the resource'
+        end
+      end
+      private :check_link_values
 
       def link_template(key, value)
         @link_templates[key] = value
@@ -78,7 +96,7 @@ module Oat
           class_name = obj.class.to_s.underscore
           link_name = class_name.pluralize.to_sym
 
-          data[:links][_name] = {id: ent_hash[:id].to_s, type: link_name.to_s}
+          data[:links][_name] = {id: ent_hash[:id].to_s, type: ent_hash[:type].to_s}
 
           entity_hash[link_name] ||= []
           unless entity_hash[link_name].include? ent_hash
@@ -91,14 +109,16 @@ module Oat
         return if collection.nil? || collection.empty?
         _name = entity_name(name)
         link_name = _name.to_s.pluralize.to_sym
-        data[:links][link_name] = []
+        data[:links][link_name] = {}
+        data[:links][link_name][:id] = []
 
         collection.each do |obj|
           entity_hash[link_name] ||= []
           ent = serializer_from_block_or_class(obj, serializer_class, context_options, &block)
           if ent
             ent_hash = ent.to_hash
-            data[:links][link_name] << ent_hash[:id].to_s
+            data[:links][link_name][:type] = ent_hash[:type].to_s
+            data[:links][link_name][:id] << ent_hash[:id].to_s
             unless entity_hash[link_name].include? ent_hash
               entity_hash[link_name] << ent_hash
             end

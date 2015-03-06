@@ -5,7 +5,7 @@ describe Oat::Adapters::JsonAPI do
 
   include Fixtures
 
-  let(:serializer) { serializer_class.new(user, {:name => 'some_controller'}, Oat::Adapters::JsonAPI) }
+  let(:serializer) { jsonapi_serializer_class.new(user, {:name => 'some_controller'}, Oat::Adapters::JsonAPI) }
   let(:hash) { serializer.to_hash }
 
   describe '#to_hash' do
@@ -14,24 +14,34 @@ describe Oat::Adapters::JsonAPI do
 
       it 'contains the correct user properties' do
         expect(data).to match(
-          :type => :users,
           :id => user.id,
+          :type => :users,
           :name => user.name,
           :age => user.age,
           :controller_name => 'some_controller',
           :message_from_above => nil,
-          :links => {:self=>{:href=>"http://foo.bar.com/1"}, :empty => {:href => nil}, :friends=>["2"], :manager=>{id: "3", type: "users" }}
+          :links => {
+            :self => 'http://foo.bar.com/1',
+            :empty => nil,
+            :friends => {
+              :type => 'users',
+              :id => ['2']
+            },
+            :manager => {
+              :id => '3',
+              :type => 'managers'
+            }
+          }
         )
       end
 
       it 'contains the correct user links' do
         expect(data.fetch(:links)).to include(
-          :self => {
-            :href => "http://foo.bar.com/#{user.id}",
-          },
+          :self => "http://foo.bar.com/#{user.id}",
+          :empty => nil,
           # these links are added by embedding entities
-          :manager => {id: manager.id.to_s, type: "users"},
-          :friends => [friend.id.to_s]
+          :manager => {id: manager.id.to_s, type: 'managers'},
+          :friends => {type: 'users', id: [friend.id.to_s]}
         )
       end
     end
@@ -44,7 +54,7 @@ describe Oat::Adapters::JsonAPI do
       end
 
       context 'without meta' do
-        let(:serializer_class) {
+        let(:jsonapi_serializer_class) {
            Class.new(Oat::Serializer) do
               schema do
                 type 'users'
@@ -67,18 +77,18 @@ describe Oat::Adapters::JsonAPI do
         it 'contains the correct properties' do
           expect(linked_friends.first).to include(
             :id => friend.id,
+            :type => :users,
             :name => friend.name,
             :age => friend.age,
             :controller_name => 'some_controller',
-            :message_from_above => "Merged into parent's context"
+            :message_from_above => 'Merged into parent\'s context',
+            :links => {:self => 'http://foo.bar.com/2', :empty => nil}
           )
         end
 
         it 'contains the correct links' do
           expect(linked_friends.first.fetch(:links)).to include(
-            :self => {
-              :href => "http://foo.bar.com/#{friend.id}"
-            }
+            :self => "http://foo.bar.com/#{friend.id}"
           )
         end
       end
@@ -86,17 +96,17 @@ describe Oat::Adapters::JsonAPI do
       context 'using #entity' do
         subject(:linked_managers){ hash.fetch(:linked).fetch(:users) }
 
-        it "does not duplicate an entity that is associated with 2 objects" do
+        it 'does not duplicate an entity that is associated with 2 objects' do
           expect(linked_managers.size).to eq(1)
         end
 
-        it "contains the correct properties and links" do
+        it 'contains the correct properties and links' do
           expect(linked_managers.first).to match(
             :id => manager.id,
             :type => :managers,
             :name => manager.name,
             :age => manager.age,
-            :links => { :self => { :href => "http://foo.bar.com/#{manager.id}"} }
+            :links => { :self => "http://foo.bar.com/#{manager.id}" }
           )
         end
       end
@@ -115,55 +125,106 @@ describe Oat::Adapters::JsonAPI do
     end
 
     context 'object links' do
-      context "as string" do
-        let(:serializer_class) do
+
+      context 'special keys' do
+        context 'self' do
+          context 'as string' do
+            let(:jsonapi_serializer_class) do
+              Class.new(Oat::Serializer) do
+                schema do
+                  type 'users'
+                  link :self, "/resources/45"
+                end
+              end
+            end
+
+            it 'renders just the string' do
+              expect(hash.fetch(:data).fetch(:links)).to eq(:self => '/resources/45')
+            end
+          end
+
+          context 'as array' do
+            let(:jsonapi_serializer_class) do
+              Class.new(Oat::Serializer) do
+                schema do
+                  type 'users'
+                  link :self, ['45']
+                end
+              end
+            end
+
+            it 'errs' do
+              expect{hash}.to raise_error
+            end
+          end
+
+          context 'as hash' do
+            let(:jsonapi_serializer_class) do
+              Class.new(Oat::Serializer) do
+                schema do
+                  type 'users'
+                  link :self, { :href => '/resources/45' }
+                end
+              end
+            end
+
+            it 'errs' do
+              expect{hash}.to raise_error
+            end
+          end
+        end
+      end
+
+      context 'as string' do
+        let(:jsonapi_serializer_class) do
           Class.new(Oat::Serializer) do
             schema do
               type 'users'
-              link :self, "45"
+              link :friends, '/friends/45'
             end
           end
         end
 
         it 'renders just the string' do
-          expect(hash.fetch(:data).fetch(:links)).to eq({
-            :self => "45"
-          })
+          expect(hash.fetch(:data).fetch(:links)).to eq(:friends => '/friends/45')
         end
       end
 
       context 'as array' do
-        let(:serializer_class) do
+        let(:jsonapi_serializer_class) do
           Class.new(Oat::Serializer) do
             schema do
               type 'users'
-              link :self, ["45", "46", "47"]
+              link :friends, ['45']
             end
           end
         end
 
-        it 'renders the array' do
-          expect(hash.fetch(:data).fetch(:links)).to eq({
-            :self => ["45", "46", "47"]
-          })
+        it 'errs' do
+          expect{hash}.to raise_error
         end
       end
 
       context 'as hash' do
         context 'with single id' do
-          let(:serializer_class) do
+          let(:jsonapi_serializer_class) do
             Class.new(Oat::Serializer) do
               schema do
                 type 'users'
-                link :self, :href => "http://foo.bar.com/#{item.id}", :id => item.id.to_s, :type => 'user'
+                link :friend,
+                     :self => "http://foo.bar.com/#{item.id}/links/friend",
+                     :resource => "http://foo.bar.com/#{item.id}/friend",
+                     :id => item.id.to_s,
+                     :type => 'user'
               end
             end
           end
 
           it 'renders all the keys' do
             expect(hash.fetch(:data).fetch(:links)).to eq({
-              :self => {
-                :href => "http://foo.bar.com/#{user.id}",
+              :friend => {
+                :self => 'http://foo.bar.com/1/links/friend',
+                :resource => 'http://foo.bar.com/1/friend',
                 :id => user.id.to_s,
                 :type => 'user'
               }
@@ -171,53 +232,44 @@ describe Oat::Adapters::JsonAPI do
           end
         end
 
-        context 'with ids' do
-          let(:serializer_class) do
+        context 'with multiple ids' do
+          let(:jsonapi_serializer_class) do
             Class.new(Oat::Serializer) do
               schema do
                 type 'users'
-                link :self, :href => "http://foo.bar.com/1,2,3", :ids => ["1", "2", "3"], :type => 'user'
+                link :friends,
+                     :self => "http://foo.bar.com/#{item.id}/links/friends",
+                     :resource => "http://foo.bar.com/#{item.id}/friends",
+                     :id => ['1', '2', '3'],
+                     :type => 'user'
               end
             end
           end
 
           it 'renders all the keys' do
             expect(hash.fetch(:data).fetch(:links)).to eq({
-              :self => {
-                :href => "http://foo.bar.com/1,2,3",
-                :ids => ["1", "2", "3"],
+              :friends => {
+                :self => 'http://foo.bar.com/1/links/friends',
+                :resource => 'http://foo.bar.com/1/friends',
+                :id => ['1', '2', '3'],
                 :type => 'user'
               }
             })
           end
         end
 
-        context 'with id and ids' do
-          let(:serializer_class) do
-            Class.new(Oat::Serializer) do
-              schema do
-                type 'users'
-                link :self, :id => "45", :ids => ["1", "2", "3"]
-              end
-            end
-          end
-
-          it "errs" do
-            expect{hash}.to raise_error(ArgumentError)
-          end
-        end
-
         context 'with invalid keys' do
-          let(:serializer_class) do
+          let(:jsonapi_serializer_class) do
             Class.new(Oat::Serializer) do
               schema do
                 type 'users'
-                link :self, :not_a_valid_key => "value"
+                link :friends,
+                     :not_a_valid_key => 'value'
               end
             end
           end
 
-          it "errs" do
+          it 'errs' do
             expect{hash}.to raise_error(ArgumentError)
           end
         end
@@ -265,7 +317,7 @@ describe Oat::Adapters::JsonAPI do
 
     context 'with an entity collection' do
       let(:serializer_collection_class) do
-        USER_SERIALIZER = serializer_class unless defined?(USER_SERIALIZER)
+        USER_SERIALIZER = jsonapi_serializer_class unless defined?(USER_SERIALIZER)
         Class.new(Oat::Serializer) do
           schema do
             type 'users'
@@ -277,7 +329,7 @@ describe Oat::Adapters::JsonAPI do
       let(:collection_serializer){
         serializer_collection_class.new(
           [user,friend],
-          {:name => "some_controller"},
+          {:name => 'some_controller'},
           Oat::Adapters::JsonAPI
         )
       }
@@ -290,6 +342,7 @@ describe Oat::Adapters::JsonAPI do
         it 'contains the correct first user properties' do
           expect(users[0]).to include(
             :id => user.id,
+            :type => :users,
             :name => user.name,
             :age => user.age,
             :controller_name => 'some_controller',
@@ -300,6 +353,7 @@ describe Oat::Adapters::JsonAPI do
         it 'contains the correct second user properties' do
           expect(users[1]).to include(
             :id => friend.id,
+            :type => :users,
             :name => friend.name,
             :age => friend.age,
             :controller_name => 'some_controller',
@@ -309,26 +363,28 @@ describe Oat::Adapters::JsonAPI do
 
         it 'contains the correct user links' do
           expect(users.first.fetch(:links)).to include(
-            :self => {:href => "http://foo.bar.com/#{user.id}"},
+            :self => "http://foo.bar.com/#{user.id}",
+            :empty => nil,
             # these links are added by embedding entities
-            :manager => {id: manager.id.to_s, type: "users"},
-            :friends => [friend.id.to_s]
+            :manager => {id: manager.id.to_s, type: 'managers'},
+            :friends => {type: 'users', id: [friend.id.to_s]}
           )
         end
 
         context 'sub entity' do
           subject(:linked_managers){ collection_hash.fetch(:linked).fetch(:users) }
 
-          it "does not duplicate an entity that is associated with multiple objects" do
+          it 'does not duplicate an entity that is associated with multiple objects' do
             expect(linked_managers.size).to eq(1)
           end
 
-          it "contains the correct properties and links" do
+          it 'contains the correct properties and links' do
             expect(linked_managers.first).to include(
               :id => manager.id,
+              :type => :managers,
               :name => manager.name,
               :age => manager.age,
-              :links => { :self => {:href =>"http://foo.bar.com/#{manager.id}"} }
+              :links => { :self => "http://foo.bar.com/#{manager.id}" }
             )
           end
         end
@@ -336,24 +392,24 @@ describe Oat::Adapters::JsonAPI do
     end
 
     context 'link_template' do
-      let(:serializer_class) do
+      let(:jsonapi_serializer_class) do
         Class.new(Oat::Serializer) do
           schema do
             type 'users'
-            link "user.managers", :href => "http://foo.bar.com/{user.id}/managers", :templated => true
-            link "user.friends",  :href => "http://foo.bar.com/{user.id}/friends", :templated => true
+            link 'user.managers', :resource => 'http://foo.bar.com/{user.id}/managers', :templated => true
+            link 'user.friends',  :resource => 'http://foo.bar.com/{user.id}/friends', :templated => true
           end
         end
       end
 
       it 'renders them top level' do
         expect(hash.fetch(:links)).to eq({
-          "user.managers" => "http://foo.bar.com/{user.id}/managers",
-          "user.friends"  => "http://foo.bar.com/{user.id}/friends"
+          'user.managers' => 'http://foo.bar.com/{user.id}/managers',
+          'user.friends'  => 'http://foo.bar.com/{user.id}/friends'
         })
       end
 
-      it "doesn't render them as links on the resource" do
+      it 'doesn\'t render them as links on the resource' do
         expect(hash.fetch(:data)).to_not have_key(:links)
       end
     end
