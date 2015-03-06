@@ -14,7 +14,7 @@ module Oat
 
       def initialize(*args)
         super
-        @entities = {}
+        @entities = []
         @link_templates = {}
         @meta = {}
       end
@@ -98,9 +98,9 @@ module Oat
 
           data[:links][_name] = {id: ent_hash[:id].to_s, type: ent_hash[:type].to_s}
 
-          entity_hash[link_name] ||= []
-          unless entity_hash[link_name].include? ent_hash
-            entity_hash[link_name] << ent_hash
+          self.entities_collection ||= []
+          unless entities_collection.include? ent_hash
+            entities_collection << ent_hash
           end
         end
       end
@@ -113,14 +113,14 @@ module Oat
         data[:links][link_name][:id] = []
 
         collection.each do |obj|
-          entity_hash[link_name] ||= []
+          self.entities_collection ||= []
           ent = serializer_from_block_or_class(obj, serializer_class, context_options, &block)
           if ent
             ent_hash = ent.to_hash
             data[:links][link_name][:type] = ent_hash[:type].to_s
             data[:links][link_name][:id] << ent_hash[:id].to_s
-            unless entity_hash[link_name].include? ent_hash
-              entity_hash[link_name] << ent_hash
+            unless entities_collection.include? ent_hash
+              entities_collection << ent_hash
             end
           end
         end
@@ -154,7 +154,7 @@ module Oat
           else
             h[:data] = data
           end
-          h[:linked] = @entities if @entities.keys.any?
+          h[:included] = @entities unless @entities.empty?
           h[:links] = @link_templates if @link_templates.keys.any?
           h[:meta] = @meta if @meta.keys.any?
           return h
@@ -165,11 +165,11 @@ module Oat
 
       attr_reader :root_name
 
-      def entity_hash
+      def entities_collection
         if serializer.top == serializer
           @entities
         else
-          serializer.top.adapter.entity_hash
+          serializer.top.adapter.entities_collection
         end
       end
 

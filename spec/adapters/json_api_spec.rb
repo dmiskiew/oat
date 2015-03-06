@@ -68,14 +68,14 @@ describe Oat::Adapters::JsonAPI do
       end
     end
 
-    context 'linked' do
+    context 'included' do
       context 'using #entities' do
-        subject(:linked_friends){ hash.fetch(:linked).fetch(:friends) }
+        subject(:included_friends){ hash.fetch(:included).select {|item| item[:type] == :users} }
 
         its(:size) { should eq(1) }
 
         it 'contains the correct properties' do
-          expect(linked_friends.first).to include(
+          expect(included_friends.first).to include(
             :id => friend.id,
             :type => :users,
             :name => friend.name,
@@ -87,21 +87,21 @@ describe Oat::Adapters::JsonAPI do
         end
 
         it 'contains the correct links' do
-          expect(linked_friends.first.fetch(:links)).to include(
+          expect(included_friends.first.fetch(:links)).to include(
             :self => "http://foo.bar.com/#{friend.id}"
           )
         end
       end
 
       context 'using #entity' do
-        subject(:linked_managers){ hash.fetch(:linked).fetch(:users) }
+        subject(:included_managers){ hash.fetch(:included).select {|item| item[:type] == :managers} }
 
         it 'does not duplicate an entity that is associated with 2 objects' do
-          expect(linked_managers.size).to eq(1)
+          expect(included_managers.size).to eq(1)
         end
 
         it 'contains the correct properties and links' do
-          expect(linked_managers.first).to match(
+          expect(included_managers.first).to match(
             :id => manager.id,
             :type => :managers,
             :name => manager.name,
@@ -115,11 +115,11 @@ describe Oat::Adapters::JsonAPI do
         let(:friend) { user_class.new('Joe', 33, 2, [other_friend]) }
         let(:other_friend) { user_class.new('Jack', 28, 4, []) }
 
-        subject(:linked_friends){ hash.fetch(:linked).fetch(:friends) }
+        subject(:included_friends){ hash.fetch(:included).select {|item| item[:type] == :users} }
         its(:size) { should eq(2) }
 
         it 'has the correct entities' do
-          expect(linked_friends.map{ |friend| friend.fetch(:id) }).to include(2, 4)
+          expect(included_friends.map{ |friend| friend.fetch(:id) }).to include(2, 4)
         end
       end
     end
@@ -284,8 +284,8 @@ describe Oat::Adapters::JsonAPI do
         expect(user_data.fetch(:links)).not_to include(:manager)
       end
 
-      it 'excludes the entity from the linked hash' do
-        expect(hash.fetch(:linked)).not_to include(:managers)
+      it 'excludes the entity from the included collection' do
+        expect(hash.fetch(:included)).not_to include(:managers)
       end
     end
 
@@ -297,8 +297,8 @@ describe Oat::Adapters::JsonAPI do
         expect(user_data.fetch(:links)).not_to include(:friends)
       end
 
-      it 'excludes the entity from the linked hash' do
-        expect(hash.fetch(:linked)).not_to include(:friends)
+      it 'excludes the entity from the included collection' do
+        expect(hash.fetch(:included)).not_to include(:friends)
       end
     end
 
@@ -310,8 +310,8 @@ describe Oat::Adapters::JsonAPI do
         expect(user_data.fetch(:links)).not_to include(:friends)
       end
 
-      it 'excludes the entity from the linked hash' do
-        expect(hash.fetch(:linked)).not_to include(:friends)
+      it 'excludes the entity from the included collection' do
+        expect(hash.fetch(:included)).not_to include(:friends)
       end
     end
 
@@ -372,14 +372,14 @@ describe Oat::Adapters::JsonAPI do
         end
 
         context 'sub entity' do
-          subject(:linked_managers){ collection_hash.fetch(:linked).fetch(:users) }
+          subject(:included_managers){ collection_hash.fetch(:included).select {|item| item[:type] == :managers} }
 
           it 'does not duplicate an entity that is associated with multiple objects' do
-            expect(linked_managers.size).to eq(1)
+            expect(included_managers.size).to eq(1)
           end
 
           it 'contains the correct properties and links' do
-            expect(linked_managers.first).to include(
+            expect(included_managers.first).to include(
               :id => manager.id,
               :type => :managers,
               :name => manager.name,
