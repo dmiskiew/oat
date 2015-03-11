@@ -33,7 +33,7 @@ module Oat
         if opts.is_a?(Hash)
           templated = opts.delete(:templated)
           if templated
-            link_template(rel, opts[:resource])
+            link_template(rel, opts[:related])
           else
             check_link_keys(opts)
           end
@@ -43,7 +43,7 @@ module Oat
       end
 
       def check_link_keys(opts)
-        unsupported_opts = opts.keys - [:self, :resource, :id, :type, :meta]
+        unsupported_opts = opts.keys - [:self, :related, :id, :type, :meta]
 
         unless unsupported_opts.empty?
           raise ArgumentError, "Unsupported opts: #{unsupported_opts.join(", ")}"
@@ -61,8 +61,8 @@ module Oat
           raise 'A self member MUST BE a URL for the relationship itself (a "relationship URL")'
         end
 
-        if rel == :resource
-          raise 'A resource member MUST BE a a related resource URL'
+        if rel == :related
+          raise 'A related member MUST BE a related resource URL'
         end
 
         unless opts.is_a?(Hash)

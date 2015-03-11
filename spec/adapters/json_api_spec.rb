@@ -213,7 +213,7 @@ describe Oat::Adapters::JsonAPI do
                 type 'users'
                 link :friend,
                      :self => "http://foo.bar.com/#{item.id}/links/friend",
-                     :resource => "http://foo.bar.com/#{item.id}/friend",
+                     :related => "http://foo.bar.com/#{item.id}/friend",
                      :id => item.id.to_s,
                      :type => 'user'
               end
@@ -224,7 +224,7 @@ describe Oat::Adapters::JsonAPI do
             expect(hash.fetch(:data).fetch(:links)).to eq({
               :friend => {
                 :self => 'http://foo.bar.com/1/links/friend',
-                :resource => 'http://foo.bar.com/1/friend',
+                :related => 'http://foo.bar.com/1/friend',
                 :id => user.id.to_s,
                 :type => 'user'
               }
@@ -239,7 +239,7 @@ describe Oat::Adapters::JsonAPI do
                 type 'users'
                 link :friends,
                      :self => "http://foo.bar.com/#{item.id}/links/friends",
-                     :resource => "http://foo.bar.com/#{item.id}/friends",
+                     :related => "http://foo.bar.com/#{item.id}/friends",
                      :id => ['1', '2', '3'],
                      :type => 'user'
               end
@@ -250,7 +250,7 @@ describe Oat::Adapters::JsonAPI do
             expect(hash.fetch(:data).fetch(:links)).to eq({
               :friends => {
                 :self => 'http://foo.bar.com/1/links/friends',
-                :resource => 'http://foo.bar.com/1/friends',
+                :related => 'http://foo.bar.com/1/friends',
                 :id => ['1', '2', '3'],
                 :type => 'user'
               }
@@ -396,8 +396,8 @@ describe Oat::Adapters::JsonAPI do
         Class.new(Oat::Serializer) do
           schema do
             type 'users'
-            link 'user.managers', :resource => 'http://foo.bar.com/{user.id}/managers', :templated => true
-            link 'user.friends',  :resource => 'http://foo.bar.com/{user.id}/friends', :templated => true
+            link 'user.managers', :related => 'http://foo.bar.com/{user.id}/managers', :templated => true
+            link 'user.friends',  :related => 'http://foo.bar.com/{user.id}/friends', :templated => true
           end
         end
       end
