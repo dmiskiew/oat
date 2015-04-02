@@ -17,6 +17,7 @@ module Oat
         @entities = []
         @link_templates = {}
         @meta = {}
+        @is_top_serializer = serializer.top == serializer
       end
 
       def rel(rels)
@@ -99,7 +100,7 @@ module Oat
           data[:links][_name] = {id: ent_hash[:id].to_s, type: ent_hash[:type].to_s}
 
           self.entities_collection ||= []
-          unless entities_collection.include? ent_hash
+          unless collection_includes_entity?(entities_collection, ent_hash)
             entities_collection << ent_hash
           end
         end
@@ -119,7 +120,7 @@ module Oat
             ent_hash = ent.to_hash
             data[:links][link_name][:type] = ent_hash[:type].to_s
             data[:links][link_name][:id] << ent_hash[:id].to_s
-            unless entities_collection.include? ent_hash
+            unless collection_includes_entity?(entities_collection, ent_hash)
               entities_collection << ent_hash
             end
           end
@@ -145,7 +146,7 @@ module Oat
 
       def to_hash
         raise "JSON API entities MUST define a type. Use type 'user' in your serializers" unless root_name
-        if serializer.top != serializer
+        if !@is_top_serializer
           return data
         else
           h = {data: {}}
@@ -165,8 +166,19 @@ module Oat
 
       attr_reader :root_name
 
+      def collection_includes_entity?(collection, entity)
+        result = false
+        limit = collection.size
+        i = 0
+        while i < limit
+          return true if collection[i][:id] == entity[:id] && collection[i][:type] == entity[:type]
+          i = i + 1
+        end
+        result
+      end
+
       def entities_collection
-        if serializer.top == serializer
+        if @is_top_serializer
           @entities
         else
           serializer.top.adapter.entities_collection
