@@ -62,6 +62,7 @@ module Oat
 
     def map_property(name)
       value = item.send(name)
+      value = value.to_s if name.to_sym == :id
       property name, value
     end
 
